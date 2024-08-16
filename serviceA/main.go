@@ -2,12 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
 
+	"github.com/failsafe-go/failsafe-go"
 	"github.com/failsafe-go/failsafe-go/failsafehttp"
-	"github.com/failsafe-go/failsafe-go/timeout"
+	"github.com/failsafe-go/failsafe-go/retrypolicy"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -19,12 +21,20 @@ func main() {
 		type response struct {
 			Message string `json:"message"`
 		}
-		// Create a Timeout for 1 second
-		timeOut := timeout.With[*http.Response](1 * time.Second)
+		// Create a RetryPolicy that only handles 500 responses, with backoff delays between retries
+		retryPolicy := retrypolicy.Builder[*http.Response]().
+			HandleIf(func(response *http.Response, _ error) bool {
+				return response != nil && response.StatusCode == 500
+			}).
+			WithBackoff(time.Second, 10*time.Second).
+			OnRetryScheduled(func(e failsafe.ExecutionScheduledEvent[*http.Response]) {
+				fmt.Println("Retry", e.Attempts(), "after delay of", e.Delay)
+			}).Build()
 
-		// Use the Timeout with a failsafe RoundTripper
-		roundTripper := failsafehttp.NewRoundTripper(nil, timeOut)
+		// Use the RetryPolicy with a failsafe RoundTripper
+		roundTripper := failsafehttp.NewRoundTripper(nil, retryPolicy)
 		client := &http.Client{Transport: roundTripper}
+
 		resp, err := client.Get("http://localhost:3001")
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
