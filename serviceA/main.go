@@ -4,7 +4,10 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"time"
 
+	"github.com/failsafe-go/failsafe-go/failsafehttp"
+	"github.com/failsafe-go/failsafe-go/timeout"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -16,7 +19,13 @@ func main() {
 		type response struct {
 			Message string `json:"message"`
 		}
-		resp, err := http.Get("http://localhost:3001")
+		// Create a Timeout for 1 second
+		timeOut := timeout.With[*http.Response](1 * time.Second)
+
+		// Use the Timeout with a failsafe RoundTripper
+		roundTripper := failsafehttp.NewRoundTripper(nil, timeOut)
+		client := &http.Client{Transport: roundTripper}
+		resp, err := client.Get("http://localhost:3001")
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
