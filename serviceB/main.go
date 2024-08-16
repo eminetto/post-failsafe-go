@@ -17,8 +17,11 @@ func main() {
 		retryAfterDelay := 1 * time.Second
 		if fail() {
 			w.Header().Add("Retry-After", strconv.Itoa(int(retryAfterDelay.Seconds())))
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusServiceUnavailable)
 			return
+		}
+		if sleep() {
+			time.Sleep(1 * time.Second)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.Write([]byte(`{"message": "hello from service B"}`))
@@ -27,6 +30,13 @@ func main() {
 }
 
 func fail() bool {
+	if flipint := rand.Intn(2); flipint == 0 {
+		return true
+	}
+	return false
+}
+
+func sleep() bool {
 	if flipint := rand.Intn(2); flipint == 0 {
 		return true
 	}
