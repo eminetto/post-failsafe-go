@@ -1,3 +1,5 @@
+github.com/bits-and-blooms/bitset v1.13.0 h1:bAQ9OPNFYbGHV6Nez0tmNI0RiEu7/hxlYJRUA0wFAVE=
+github.com/bits-and-blooms/bitset v1.13.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/failsafe-go/failsafe-go v0.6.7 h1:blfYom5oXiaKWpZIYle38RxApE0D7z5CGjVaj6jfjio=
 github.com/failsafe-go/failsafe-go v0.6.7/go.mod h1:+/DEPYHFm4DqjP59Vgl7Ec2RJ9PoH3FnriWPquwTLc0=
 github.com/go-chi/chi/v5 v5.1.0 h1:acVI1TYaD+hhedDJ3r54HyA6sExp3HfXq7QWEEY/xMw=
