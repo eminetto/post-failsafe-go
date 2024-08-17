@@ -1,14 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"time"
 
-	"github.com/failsafe-go/failsafe-go/circuitbreaker"
+	"github.com/failsafe-go/failsafe-go"
 	"github.com/failsafe-go/failsafe-go/failsafehttp"
+	"github.com/failsafe-go/failsafe-go/fallback"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -17,38 +18,24 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		type response struct {
-			Message string `json:"message"`
+		resp := &http.Response{
+			StatusCode: http.StatusOK,
+			Header:     map[string][]string{"Content-Type": {"application/json"}},
+			Body:       io.NopCloser(bytes.NewBufferString(`{"message": "error accessing service B"}`)),
 		}
-		// Create a CircuitBreaker that handles 503 responses and uses a half-open delay based on the Retry-After header
-		circuitBreaker := circuitbreaker.Builder[*http.Response]().
+		fallback := fallback.BuilderWithResult[*http.Response](resp).
 			HandleIf(func(response *http.Response, err error) bool {
 				return response != nil && response.StatusCode == http.StatusServiceUnavailable
 			}).
-			WithDelayFunc(failsafehttp.DelayFunc).
-			OnStateChanged(func(event circuitbreaker.StateChangedEvent) {
-				fmt.Println("circuit breaker state changed", event)
+			OnFallbackExecuted(func(e failsafe.ExecutionDoneEvent[*http.Response]) {
+				fmt.Println("Fallback executed result")
 			}).
 			Build()
 
-		// Use the RetryPolicy with a failsafe RoundTripper
-		roundTripper := failsafehttp.NewRoundTripper(nil, circuitBreaker)
+		roundTripper := failsafehttp.NewRoundTripper(nil, fallback)
 		client := &http.Client{Transport: roundTripper}
 
-		sendGet := func() (*http.Response, error) {
-			fmt.Println("Sending request")
-			resp, err := client.Get("http://localhost:3001")
-			return resp, err
-		}
-		maxRetries := 3
-		resp, err := sendGet()
-		for i := 0; i < maxRetries; i++ {
-			if err == nil && resp != nil && resp.StatusCode != http.StatusServiceUnavailable && resp.StatusCode != http.StatusTooManyRequests {
-				break
-			}
-			time.Sleep(circuitBreaker.RemainingDelay()) // Wait for circuit breaker's delay, provided by the Retry-After header
-			resp, err = sendGet()
-		}
+		resp, err := client.Get("http://localhost:3001")
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
@@ -61,6 +48,9 @@ func main() {
 			return
 		}
 		defer resp.Body.Close()
+		type response struct {
+			Message string `json:"message"`
+		}
 		var data response
 		err = json.Unmarshal(body, &data)
 		if err != nil {
