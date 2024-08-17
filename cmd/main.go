@@ -24,7 +24,7 @@ func main() {
 		go func() {
 			err := failsafe.Run(func() error {
 				defer wg.Done()
-				fmt.Println("service A")
+				fmt.Println("resource being accessed")
 				return nil
 			}, limiter)
 			if err != nil {
