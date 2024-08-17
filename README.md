@@ -8,5 +8,5 @@ Repo used to demonstrate the project https://failsafe-go.dev/
 - [x] [Circuit Breaker](https://github.com/eminetto/post-failsafe-go/pull/3)
 - [x] [Fallback](https://github.com/eminetto/post-failsafe-go/pull/4)
 - [ ] Bulkhead
-- [ ] Rate Limiter
+- [x] [Rate Limiter](https://github.com/eminetto/post-failsafe-go/pull/5/files)
 - [ ] Policy Composition
