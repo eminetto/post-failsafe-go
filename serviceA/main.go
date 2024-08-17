@@ -1,15 +1,15 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/failsafe-go/failsafe-go"
+	"github.com/failsafe-go/failsafe-go/bulkhead"
 	"github.com/failsafe-go/failsafe-go/failsafehttp"
-	"github.com/failsafe-go/failsafe-go/fallback"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -18,23 +18,17 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
-		resp := &http.Response{
-			StatusCode: http.StatusOK,
-			Header:     map[string][]string{"Content-Type": {"application/json"}},
-			Body:       io.NopCloser(bytes.NewBufferString(`{"message": "error accessing service B"}`)),
-		}
-		fallback := fallback.BuilderWithResult[*http.Response](resp).
-			HandleIf(func(response *http.Response, err error) bool {
-				return response != nil && response.StatusCode == http.StatusServiceUnavailable
-			}).
-			OnFallbackExecuted(func(e failsafe.ExecutionDoneEvent[*http.Response]) {
-				fmt.Println("Fallback executed result")
+		bulkhead := bulkhead.Builder[*http.Response](1).
+			WithMaxWaitTime(1 * time.Second).
+			OnFull(func(e failsafe.ExecutionEvent[*http.Response]) {
+				fmt.Println("Bulkhead full")
+				fmt.Println(e)
+				panic("Bulkhead full")
 			}).
 			Build()
 
-		roundTripper := failsafehttp.NewRoundTripper(nil, fallback)
+		roundTripper := failsafehttp.NewRoundTripper(nil, bulkhead)
 		client := &http.Client{Transport: roundTripper}
-
 		resp, err := client.Get("http://localhost:3001")
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
