@@ -6,14 +6,10 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-<<<<<<< HEAD
 	"time"
-=======
->>>>>>> main
 
 	"github.com/failsafe-go/failsafe-go"
 	"github.com/failsafe-go/failsafe-go/failsafehttp"
-	"github.com/failsafe-go/failsafe-go/fallback"
 	"github.com/failsafe-go/failsafe-go/timeout"
 	"github.com/go-chi/chi/v5"
 	slogchi "github.com/samber/slog-chi"
@@ -59,7 +55,7 @@ func main() {
 	http.ListenAndServe(":3000", r)
 }
 
-func newTimeout(logger *slog.Logger) fallback.Fallback[*http.Response] {
+func newTimeout(logger *slog.Logger) timeout.Timeout[*http.Response] {
 	return timeout.Builder[*http.Response](1 * time.Second).
 		OnTimeoutExceeded(func(e failsafe.ExecutionDoneEvent[*http.Response]) {
 			logger.Info("Connection timed out")
