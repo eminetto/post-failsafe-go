@@ -63,7 +63,7 @@ func main() {
 	http.ListenAndServe(":3000", r)
 }
 
-func newTimeout(logger *slog.Logger) fallback.Fallback[*http.Response] {
+func newTimeout(logger *slog.Logger) timeout.Timeout[*http.Response] {
 	return timeout.Builder[*http.Response](10 * time.Second).
 		OnTimeoutExceeded(func(e failsafe.ExecutionDoneEvent[*http.Response]) {
 			logger.Info("Connection timed out")
