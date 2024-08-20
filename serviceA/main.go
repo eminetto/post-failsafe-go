@@ -6,7 +6,11 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
+	"github.com/failsafe-go/failsafe-go"
+	"github.com/failsafe-go/failsafe-go/failsafehttp"
+	"github.com/failsafe-go/failsafe-go/timeout"
 	"github.com/go-chi/chi/v5"
 	slogchi "github.com/samber/slog-chi"
 )
@@ -19,7 +23,13 @@ func main() {
 		type response struct {
 			Message string `json:"message"`
 		}
-		resp, err := http.Get("http://localhost:3001")
+		// Create a Timeout for 1 second
+		timeout := newTimeout(logger)
+
+		// Use the Timeout with a failsafe RoundTripper
+		roundTripper := failsafehttp.NewRoundTripper(nil, timeout)
+		client := &http.Client{Transport: roundTripper}
+		resp, err := client.Get("http://localhost:3001")
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
@@ -43,4 +53,11 @@ func main() {
 		w.Write([]byte(`{"messageA": "hello from service A","messageB": "` + data.Message + `"}`))
 	})
 	http.ListenAndServe(":3000", r)
+}
+
+func newTimeout(logger *slog.Logger) timeout.Timeout[*http.Response] {
+	return timeout.Builder[*http.Response](1 * time.Second).
+		OnTimeoutExceeded(func(e failsafe.ExecutionDoneEvent[*http.Response]) {
+			logger.Info("Connection timed out")
+		}).Build()
 }
