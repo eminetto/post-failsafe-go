@@ -3,15 +3,18 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	slogchi "github.com/samber/slog-chi"
 )
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+	r.Use(slogchi.New(logger))
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		type response struct {
 			Message string `json:"message"`
