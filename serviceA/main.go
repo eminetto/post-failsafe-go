@@ -4,39 +4,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/failsafe-go/failsafe-go/circuitbreaker"
 	"github.com/failsafe-go/failsafe-go/failsafehttp"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	slogchi "github.com/samber/slog-chi"
 )
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+	r.Use(slogchi.New(logger))
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		type response struct {
 			Message string `json:"message"`
 		}
 		// Create a CircuitBreaker that handles 503 responses and uses a half-open delay based on the Retry-After header
-		circuitBreaker := circuitbreaker.Builder[*http.Response]().
-			HandleIf(func(response *http.Response, err error) bool {
-				return response != nil && response.StatusCode == http.StatusServiceUnavailable
-			}).
-			WithDelayFunc(failsafehttp.DelayFunc).
-			OnStateChanged(func(event circuitbreaker.StateChangedEvent) {
-				fmt.Println("circuit breaker state changed", event)
-			}).
-			Build()
+		circuitBreaker := newCircuitBreaker(logger)
 
 		// Use the RetryPolicy with a failsafe RoundTripper
 		roundTripper := failsafehttp.NewRoundTripper(nil, circuitBreaker)
 		client := &http.Client{Transport: roundTripper}
 
 		sendGet := func() (*http.Response, error) {
-			fmt.Println("Sending request")
 			resp, err := client.Get("http://localhost:3001")
 			return resp, err
 		}
@@ -72,4 +66,16 @@ func main() {
 		w.Write([]byte(`{"messageA": "hello from service A","messageB": "` + data.Message + `"}`))
 	})
 	http.ListenAndServe(":3000", r)
+}
+
+func newCircuitBreaker(logger *slog.Logger) circuitbreaker.CircuitBreaker[*http.Response] {
+	return circuitbreaker.Builder[*http.Response]().
+		HandleIf(func(response *http.Response, err error) bool {
+			return response != nil && response.StatusCode == http.StatusServiceUnavailable
+		}).
+		WithDelayFunc(failsafehttp.DelayFunc).
+		OnStateChanged(func(event circuitbreaker.StateChangedEvent) {
+			logger.Info(fmt.Sprintf("circuit breaker state changed from %s to %s", event.OldState.String(), event.NewState.String()))
+		}).
+		Build()
 }
