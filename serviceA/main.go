@@ -22,7 +22,6 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-
 	r := chi.NewRouter()
 	r.Use(slogchi.New(logger))
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
