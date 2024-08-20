@@ -1,4 +1,4 @@
-module github.com/eminetto/post-failsafe-go/sericeA
+module github.com/eminetto/post-failsafe-go/serviceA
 
 go 1.22.5
 
