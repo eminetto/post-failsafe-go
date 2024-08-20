@@ -3,27 +3,32 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
+	"github.com/failsafe-go/failsafe-go"
 	"github.com/failsafe-go/failsafe-go/failsafehttp"
+	"github.com/failsafe-go/failsafe-go/fallback"
 	"github.com/failsafe-go/failsafe-go/timeout"
 	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
+	slogchi "github.com/samber/slog-chi"
 )
 
 func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	r := chi.NewRouter()
-	r.Use(middleware.Logger)
+	r.Use(slogchi.New(logger))
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		type response struct {
 			Message string `json:"message"`
 		}
 		// Create a Timeout for 1 second
-		timeOut := timeout.With[*http.Response](1 * time.Second)
+		timeout := newTimeout(logger)
 
 		// Use the Timeout with a failsafe RoundTripper
-		roundTripper := failsafehttp.NewRoundTripper(nil, timeOut)
+		roundTripper := failsafehttp.NewRoundTripper(nil, timeout)
 		client := &http.Client{Transport: roundTripper}
 		resp, err := client.Get("http://localhost:3001")
 		if err != nil {
@@ -49,4 +54,11 @@ func main() {
 		w.Write([]byte(`{"messageA": "hello from service A","messageB": "` + data.Message + `"}`))
 	})
 	http.ListenAndServe(":3000", r)
+}
+
+func newTimeout(logger *slog.Logger) fallback.Fallback[*http.Response] {
+	return timeout.Builder[*http.Response](1 * time.Second).
+		OnTimeoutExceeded(func(e failsafe.ExecutionDoneEvent[*http.Response]) {
+			logger.Info("Connection timed out")
+		}).Build()
 }
