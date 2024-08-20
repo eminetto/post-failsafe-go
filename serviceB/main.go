@@ -17,7 +17,7 @@ func main() {
 		retryAfterDelay := 1 * time.Second
 		if fail() {
 			w.Header().Add("Retry-After", strconv.Itoa(int(retryAfterDelay.Seconds())))
-			w.WriteHeader(http.StatusInternalServerError)
+			w.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
