@@ -36,7 +36,19 @@ func main() {
 		roundTripper := failsafehttp.NewRoundTripper(nil, fallback, retryPolicy, circuitBreaker, timeout)
 		client := &http.Client{Transport: roundTripper}
 
-		resp, err := client.Get("http://localhost:3001")
+		sendGet := func() (*http.Response, error) {
+			resp, err := client.Get("http://localhost:3001")
+			return resp, err
+		}
+		maxRetries := 3
+		resp, err := sendGet()
+		for i := 0; i < maxRetries; i++ {
+			if err == nil && resp != nil && resp.StatusCode != http.StatusServiceUnavailable && resp.StatusCode != http.StatusTooManyRequests {
+				break
+			}
+			time.Sleep(circuitBreaker.RemainingDelay()) // Wait for circuit breaker's delay, provided by the Retry-After header
+			resp, err = sendGet()
+		}
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			w.Write([]byte(err.Error()))
